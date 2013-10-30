@@ -12,7 +12,6 @@ package ketama
 import (
 	"crypto/md5"
 	"fmt"
-	"math"
 	"sort"
 )
 
@@ -54,15 +53,16 @@ func New(buckets []Bucket) (Continuum, error) {
 
 	ket := make([]continuumPoint, 0, numbuckets*160)
 
-	totalweight := float64(0)
+	totalweight := 0
 	for _, b := range buckets {
-		totalweight += float64(b.Weight)
+		totalweight += b.Weight
 	}
 
 	for i, b := range buckets {
-		pct := float64(b.Weight) / totalweight
+		pct := float32(b.Weight) / float32(totalweight)
 
-		limit := int(math.Floor(pct * 40.0 * float64(numbuckets)))
+		// this is the equivalent of C's promotion rules, but in Go, to maintain exact compatibility with the C library
+		limit := int(float32(float64(pct) * 40.0 * float64(numbuckets)))
 
 		for k := 0; k < limit; k++ {
 			/* 40 hashes, 4 numbers per hash = 160 points per bucket */
