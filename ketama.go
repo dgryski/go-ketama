@@ -93,9 +93,55 @@ func (cont Continuum) Hash(thing string) string {
 	}
 
 	h := hashString(thing)
-	i := sort.Search(len(cont), func(i int) bool { return cont[i].point >= h })
-	if i >= len(cont) {
-		i = 0
-	}
+
+	i := search(cont, h)
+
 	return cont[i].bucket.Label
+}
+
+// This function taken from
+// https://github.com/lestrrat/Algorithm-ConsistentHash-Ketama/blob/master/xs/Ketama.xs
+// In order to maintain compatibility, we must reproduce the same integer
+// underflow bug introduced in
+// https://github.com/lestrrat/Algorithm-ConsistentHash-Ketama/commit/1efbcc0ead13114f8e4e454a8064b842b14da6f3
+
+func search(cont Continuum, h uint) uint {
+	var maxp = uint(len(cont))
+	var lowp = uint(0)
+	var highp = maxp
+
+	for {
+		midp := (lowp + highp) / 2
+		if midp >= maxp {
+			if midp == maxp {
+				midp = 1
+			} else {
+				midp = maxp
+			}
+
+			return midp - 1
+		}
+		midval := cont[midp].point
+		var midval1 uint
+		if midp == 0 {
+			midval1 = 0
+		} else {
+			midval1 = cont[midp-1].point
+		}
+
+		if h <= midval && h > midval1 {
+			return midp
+		}
+
+		if midval < h {
+			lowp = midp + 1
+		} else {
+			// NOTE(dgryski): Maintaining compatibility with Algorithm::ConsistentHash::Ketama depends on integer underflow here
+			highp = midp - 1
+		}
+
+		if lowp > highp {
+			return 0
+		}
+	}
 }
