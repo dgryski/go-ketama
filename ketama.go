@@ -2,7 +2,7 @@
 /*
 This implementation draws from the Daisuke Maki's Perl module, which itself is
 based on the original libketama code.  That code was licensed under the GPLv2,
-and thus so it this.
+and thus so is this.
 
 The major API change from libketama is that Algorithm::ConsistentHash::Ketama allows hashing
 arbitrary strings, instead of just memcached server IP addresses.
