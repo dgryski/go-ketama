@@ -25,11 +25,15 @@ type continuumPoint struct {
 	point  uint
 }
 
-type Continuum []continuumPoint
+type Continuum struct {
+	ring points
+}
 
-func (c Continuum) Less(i, j int) bool { return c[i].point < c[j].point }
-func (c Continuum) Len() int           { return len(c) }
-func (c Continuum) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
+type points []continuumPoint
+
+func (c points) Less(i, j int) bool { return c[i].point < c[j].point }
+func (c points) Len() int           { return len(c) }
+func (c points) Swap(i, j int)      { c[i], c[j] = c[j], c[i] }
 
 func md5Digest(in string) []byte {
 	h := md5.New()
@@ -42,16 +46,16 @@ func hashString(in string) uint {
 	return uint(digest[3])<<24 | uint(digest[2])<<16 | uint(digest[1])<<8 | uint(digest[0])
 }
 
-func New(buckets []Bucket) (Continuum, error) {
+func New(buckets []Bucket) (*Continuum, error) {
 
 	numbuckets := len(buckets)
 
 	if numbuckets == 0 {
 		// let them error when they try to use it
-		return Continuum(nil), nil
+		return nil, nil
 	}
 
-	ket := make([]continuumPoint, 0, numbuckets*160)
+	ring := make(points, 0, numbuckets*160)
 
 	totalweight := 0
 	for _, b := range buckets {
@@ -74,29 +78,29 @@ func New(buckets []Bucket) (Continuum, error) {
 					point:  uint(digest[3+h*4])<<24 | uint(digest[2+h*4])<<16 | uint(digest[1+h*4])<<8 | uint(digest[h*4]),
 					bucket: buckets[i],
 				}
-				ket = append(ket, point)
+				ring = append(ring, point)
 			}
 		}
 	}
 
-	cont := Continuum(ket)
+	sort.Sort(ring)
 
-	sort.Sort(cont)
-
-	return cont, nil
+	return &Continuum{
+		ring: ring,
+	}, nil
 }
 
-func (cont Continuum) Hash(thing string) string {
+func (c Continuum) Hash(thing string) string {
 
-	if len(cont) == 0 {
+	if len(c.ring) == 0 {
 		return ""
 	}
 
 	h := hashString(thing)
 
-	i := search(cont, h)
+	i := search(c.ring, h)
 
-	return cont[i].bucket.Label
+	return c.ring[i].bucket.Label
 }
 
 // This function taken from
@@ -105,8 +109,8 @@ func (cont Continuum) Hash(thing string) string {
 // underflow bug introduced in
 // https://github.com/lestrrat/Algorithm-ConsistentHash-Ketama/commit/1efbcc0ead13114f8e4e454a8064b842b14da6f3
 
-func search(cont Continuum, h uint) uint {
-	var maxp = uint(len(cont))
+func search(ring points, h uint) uint {
+	var maxp = uint(len(ring))
 	var lowp = uint(0)
 	var highp = maxp
 
@@ -121,12 +125,12 @@ func search(cont Continuum, h uint) uint {
 
 			return midp - 1
 		}
-		midval := cont[midp].point
+		midval := ring[midp].point
 		var midval1 uint
 		if midp == 0 {
 			midval1 = 0
 		} else {
-			midval1 = cont[midp-1].point
+			midval1 = ring[midp-1].point
 		}
 
 		if h <= midval && h > midval1 {
