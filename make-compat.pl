@@ -5,9 +5,11 @@ use warnings;
 
 use Algorithm::ConsistentHash::Ketama;
 
-my $ketama = Algorithm::ConsistentHash::Ketama->new();
+my $hashfunc = 2;
 
-print <<EOGO;
+my $ketama = Algorithm::ConsistentHash::Ketama->new(use_hashfunc => $hashfunc);
+
+print <<"EOGO";
 package ketama
 
 import (
@@ -16,10 +18,13 @@ import (
         "testing"
 )
 
-var compatTests = [][]Bucket{
+var compat${hashfunc}Tests = [][]Bucket{
 EOGO
 
-for my $bucket (1..500) {
+my $keys = 1_000;
+my $buckets = 50;
+
+for my $bucket (1..$buckets) {
 
     # print STDERR "bucket=$bucket\n";
 
@@ -27,7 +32,7 @@ for my $bucket (1..500) {
 
     my %m;
 
-    for (my $i=0; $i < 100000; $i++) {
+    for (my $i=0; $i < $keys; $i++) {
         $m{$ketama->hash("foo$i")}++
     }
 
@@ -39,28 +44,28 @@ for my $bucket (1..500) {
 }
 print "}\n";
 
-print <<EOGO;
+print <<"EOGO";
 
-func TestKetama(t *testing.T) {
+func TestKetama$hashfunc(t *testing.T) {
 
         var buckets []Bucket
 
 BUCKET:
-        for bucket := 1; bucket <= len(compatTests); bucket++ {
+        for bucket := 1; bucket <= len(compat${hashfunc}Tests); bucket++ {
 
                 b := &Bucket{Label: fmt.Sprintf("server%d", bucket), Weight: 1}
                 buckets = append(buckets, *b)
 
-                k, _ := New(buckets)
+                k, _ := NewWithHash(buckets, HashFunc$hashfunc)
 
                 m := make(map[string]int)
 
-                for i := 0; i < 100000; i++ {
+                for i := 0; i < $keys; i++ {
                         s := k.Hash("foo" + strconv.Itoa(i))
                         m[s]++
                 }
 
-                for _, tt := range compatTests[bucket-1] {
+                for _, tt := range compat${hashfunc}Tests[bucket-1] {
                         if m[tt.Label] != tt.Weight {
                                 t.Errorf("compatibility check failed for buckets=%d key=%s expected=%d got=%d", bucket, tt.Label, tt.Weight, m[tt.Label])
                                 continue BUCKET
