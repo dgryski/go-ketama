@@ -25,8 +25,18 @@ type continuumPoint struct {
 	point  uint
 }
 
+type HashFunc int
+
+const (
+	// Old broken hashing function
+	HashFunc1 HashFunc = iota
+	// `Correct` binary search
+	HashFunc2
+)
+
 type Continuum struct {
 	ring points
+	hash HashFunc
 }
 
 type points []continuumPoint
@@ -46,7 +56,7 @@ func hashString(in string) uint {
 	return uint(digest[3])<<24 | uint(digest[2])<<16 | uint(digest[1])<<8 | uint(digest[0])
 }
 
-func New(buckets []Bucket) (*Continuum, error) {
+func NewWithHash(buckets []Bucket, hash HashFunc) (*Continuum, error) {
 
 	numbuckets := len(buckets)
 
@@ -87,7 +97,12 @@ func New(buckets []Bucket) (*Continuum, error) {
 
 	return &Continuum{
 		ring: ring,
+		hash: hash,
 	}, nil
+}
+
+func New(buckets []Bucket) (*Continuum, error) {
+	return NewWithHash(buckets, HashFunc1)
 }
 
 func (c Continuum) Hash(thing string) string {
@@ -98,7 +113,17 @@ func (c Continuum) Hash(thing string) string {
 
 	h := hashString(thing)
 
-	i := search(c.ring, h)
+	// the above md5 is way more expensive than this branch
+	var i uint
+	switch c.hash {
+	case HashFunc1:
+		i = search(c.ring, h)
+	case HashFunc2:
+		i = uint(sort.Search(len(c.ring), func(i int) bool { return c.ring[i].point >= h }))
+		if i >= uint(len(c.ring)) {
+			i = 0
+		}
+	}
 
 	return c.ring[i].bucket.Label
 }
