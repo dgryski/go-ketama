@@ -128,6 +128,44 @@ func (c Continuum) Hash(thing string) string {
 	return c.ring[i].bucket.Label
 }
 
+func (c Continuum) HashMultiple(thing string, count int) []string {
+
+	if len(c.ring) == 0 {
+		return nil
+	}
+
+	h := hashString(thing)
+
+	// the above md5 is way more expensive than this branch
+	var i uint
+	switch c.hash {
+	case HashFunc1:
+		i = search(c.ring, h)
+	case HashFunc2:
+		i = uint(sort.Search(len(c.ring), func(i int) bool { return c.ring[i].point >= h }))
+		if i >= uint(len(c.ring)) {
+			i = 0
+		}
+	}
+
+	seen := make(map[string]struct{})
+	result := make([]string, 0, count)
+
+	for len(result) < count {
+		label := c.ring[i].bucket.Label
+		if _, ok := seen[label]; !ok {
+			result = append(result, label)
+			seen[label] = struct{}{}
+		}
+		i++
+		if i >= uint(len(c.ring)) {
+			i = 0
+		}
+	}
+
+	return result
+}
+
 // This function taken from
 // https://github.com/lestrrat/Algorithm-ConsistentHash-Ketama/blob/master/xs/Ketama.xs
 // In order to maintain compatibility, we must reproduce the same integer
