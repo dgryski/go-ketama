@@ -69,3 +69,29 @@ func TestSegfault(t *testing.T) {
 	}
 
 }
+
+func TestAcceptableWeights(t *testing.T) {
+	var err error
+	var c *Continuum
+
+	_, err = New([]Bucket{{"foo", 1}})
+	if err != nil {
+		t.Errorf("Weight of 1 must be supported.")
+	}
+
+	c, err = New([]Bucket{{"foo", 0}})
+	if err != nil {
+		t.Errorf("Weight of 0 must be supported.")
+	}
+	if len(c.ring) == 0 {
+		t.Errorf("Weight of 0 must be considered to be 1.")
+	}
+
+	_, err = New([]Bucket{{"foo", -1}})
+	if err == nil {
+		t.Errorf("Weight < 0 must be rejected.")
+	}
+	if err != ErrNegativeWeight {
+		t.Errorf("Wrong error returned.")
+	}
+}

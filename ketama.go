@@ -11,6 +11,7 @@ package ketama
 
 import (
 	"crypto/md5"
+	"errors"
 	"fmt"
 	"sort"
 )
@@ -32,6 +33,10 @@ const (
 	HashFunc1 HashFunc = iota
 	// `Correct` binary search
 	HashFunc2
+)
+
+var (
+	ErrNegativeWeight = errors.New("ketama: negative weight is not allowed")
 )
 
 type Continuum struct {
@@ -56,6 +61,16 @@ func hashString(in string) uint {
 	return uint(digest[3])<<24 | uint(digest[2])<<16 | uint(digest[1])<<8 | uint(digest[0])
 }
 
+func fixWeight(weight int) int {
+	// libmemcached treats 0 weight to be the same as 1 so we should behave
+	// the same way
+	if weight == 0 {
+		return 1
+	}
+
+	return weight
+}
+
 func NewWithHash(buckets []Bucket, hash HashFunc) (*Continuum, error) {
 
 	numbuckets := len(buckets)
@@ -69,11 +84,15 @@ func NewWithHash(buckets []Bucket, hash HashFunc) (*Continuum, error) {
 
 	totalweight := 0
 	for _, b := range buckets {
-		totalweight += b.Weight
+		if b.Weight < 0 {
+			return nil, ErrNegativeWeight
+		}
+
+		totalweight += fixWeight(b.Weight)
 	}
 
 	for i, b := range buckets {
-		pct := float32(b.Weight) / float32(totalweight)
+		pct := float32(fixWeight(b.Weight)) / float32(totalweight)
 
 		// this is the equivalent of C's promotion rules, but in Go, to maintain exact compatibility with the C library
 		limit := int(float32(float64(pct) * 40.0 * float64(numbuckets)))
